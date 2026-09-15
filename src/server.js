@@ -12,22 +12,25 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-// CORS — allow localhost dev + Cloudflare Pages production
+
+// CORS — allow Cloudflare Pages (any *.pages.dev), explicit FRONTEND_URL, and localhost dev
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL,   // e.g. https://ayasofya-bd.pages.dev  (set in Render env vars)
+  'https://ayasofya-bd.pages.dev',
   'http://localhost:5173',
   'http://localhost:4173',
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl)
+    // Allow requests with no origin (mobile apps, server-to-server, curl)
     if (!origin) return callback(null, true);
-    // Allow any .pages.dev subdomain (Cloudflare Pages)
-    if (origin.endsWith('.pages.dev') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(null, true); // Allow all for now — tighten after deploy
+    // Allow any Cloudflare Pages preview/production subdomain
+    if (origin.endsWith('.pages.dev')) return callback(null, true);
+    // Allow explicitly listed origins
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Block everything else
+    return callback(new Error(`CORS: origin ${origin} not allowed`), false);
   },
   credentials: true
 }));
