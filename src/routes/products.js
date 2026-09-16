@@ -86,6 +86,11 @@ router.post('/admin', adminAuth, productUpload.array('images', 10), (req, res) =
   const discount = sale_price ? Math.round(((regular_price - sale_price) / regular_price) * 100) : 0;
   const images = req.files ? req.files.map(f => `/uploads/products/${f.filename}`) : [];
   const stock = parseInt(body.stock_quantity) || 0;
+  // Register images in media library for reuse
+  if (req.files && req.files.length > 0) {
+    const ins = db.prepare(`INSERT OR IGNORE INTO media (id,filename,original_name,mimetype,size,url,folder) VALUES (?,?,?,?,?,?,?)`);
+    for (const f of req.files) ins.run(uuidv4(), f.filename, f.originalname, f.mimetype, f.size, `/uploads/products/${f.filename}`, 'products');
+  }
   db.prepare(`INSERT INTO products (id,name,slug,sku,description,short_description,category_id,brand_id,regular_price,sale_price,discount_percent,stock_quantity,stock_status,manage_stock,images,tags,is_featured,is_bestseller,is_new_arrival,is_on_offer,is_published,specifications,delivery_info,return_policy,meta_title,meta_description) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, body.name, productSlug, body.sku || null, body.description || null, body.short_description || null, body.category_id || null, body.brand_id || null, regular_price, sale_price, discount, stock, stock > 0 ? 'in_stock' : 'out_of_stock', body.manage_stock === 'false' ? 0 : 1, JSON.stringify(images), body.tags ? (Array.isArray(body.tags) ? JSON.stringify(body.tags) : body.tags) : '[]', body.is_featured === 'true' ? 1 : 0, body.is_bestseller === 'true' ? 1 : 0, body.is_new_arrival === 'true' ? 1 : 0, body.is_on_offer === 'true' ? 1 : 0, body.is_published === 'false' ? 0 : 1, body.specifications || null, body.delivery_info || null, body.return_policy || null, body.meta_title || null, body.meta_description || null);
   res.status(201).json({ message: 'Product created', id });
 });
