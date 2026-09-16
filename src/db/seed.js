@@ -18,15 +18,17 @@ async function seed() {
     db.prepare("UPDATE admin_users SET is_active = 0 WHERE email = 'admin@ayasofya.com'").run();
   }
 
-  // Create owner with ayasofyabrand@gmail.com if not exists
-  const ownerExists = db.prepare("SELECT id FROM admin_users WHERE email = 'ayasofyabrand@gmail.com'").get();
-  if (!ownerExists) {
-    const hash = bcrypt.hashSync('Ayasofya@2024', 10);
-    db.prepare(`INSERT INTO admin_users (id, name, email, password, role, permissions) VALUES (?,?,?,?,?,?)`).run(
-      uuidv4(), 'Owner', 'ayasofyabrand@gmail.com', hash, 'super_admin', JSON.stringify(['*'])
-    );
-    console.log('✅ Owner created: ayasofyabrand@gmail.com / Ayasofya@2024');
-    console.log('⚠️  Please change the password immediately from Admin → Account & Security');
+  // IMPORTANT: Only create owner if NO admin accounts exist at all.
+  // If any admin exists (including ayasofyabrand@gmail.com), do NOT overwrite.
+  const anyAdmin = db.prepare("SELECT COUNT(*) as c FROM admin_users WHERE is_active = 1").get();
+  if (anyAdmin.c === 0) {
+    const hash = bcrypt.hashSync('AyaOwner2024#', 12);
+    db.prepare(`INSERT INTO admin_users (id, name, email, password, role, permissions, is_active) VALUES (?,?,?,?,?,?,1)`)
+      .run(uuidv4(), 'Owner', 'ayasofyabrand@gmail.com', hash, 'super_admin', JSON.stringify(['*']));
+    console.log('✅ Owner created: ayasofyabrand@gmail.com');
+    console.log('⚠️  Change password immediately from Admin → Account & Security');
+  } else {
+    console.log(`ℹ️  ${anyAdmin.c} admin account(s) already exist — seed skipped`);
   }
 
   // ─── Settings ───────────────────────────────────────────────
