@@ -2,14 +2,27 @@ const schema = `
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 
+-- ═══════════════════════════════════════════════════════════
+-- ADMIN USERS (with roles/permissions)
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS admin_users (
-  id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'manager',
-  avatar TEXT, is_active INTEGER NOT NULL DEFAULT 1,
-  last_login TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'staff',
+  permissions TEXT DEFAULT '[]',
+  avatar TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  invited_by TEXT,
+  last_login TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- CUSTOMERS
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS customers (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE,
   phone TEXT UNIQUE, password TEXT, avatar TEXT,
@@ -26,11 +39,17 @@ CREATE TABLE IF NOT EXISTS customer_addresses (
   is_default INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- SETTINGS
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY, value TEXT, type TEXT DEFAULT 'text',
   group_name TEXT DEFAULT 'general', updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- CATEGORIES
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
   description TEXT, image TEXT, parent_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
@@ -46,6 +65,9 @@ CREATE TABLE IF NOT EXISTS brands (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- ATTRIBUTES
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS attributes (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
   type TEXT NOT NULL DEFAULT 'select', sort_order INTEGER DEFAULT 0,
@@ -57,6 +79,9 @@ CREATE TABLE IF NOT EXISTS attribute_values (
   value TEXT NOT NULL, color_code TEXT, sort_order INTEGER DEFAULT 0
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- PRODUCTS (with soft-delete / trash)
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
   sku TEXT UNIQUE, short_description TEXT, description TEXT, specifications TEXT,
@@ -72,6 +97,7 @@ CREATE TABLE IF NOT EXISTS products (
   is_published INTEGER NOT NULL DEFAULT 1, rating_avg REAL DEFAULT 0,
   rating_count INTEGER DEFAULT 0, sold_count INTEGER DEFAULT 0,
   meta_title TEXT, meta_description TEXT, delivery_info TEXT, return_policy TEXT,
+  deleted_at TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -83,13 +109,20 @@ CREATE TABLE IF NOT EXISTS product_variations (
   image TEXT, is_active INTEGER NOT NULL DEFAULT 1
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- MEDIA LIBRARY
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS media (
   id TEXT PRIMARY KEY, filename TEXT NOT NULL, original_name TEXT NOT NULL,
   mimetype TEXT NOT NULL, size INTEGER NOT NULL, url TEXT NOT NULL,
   folder TEXT DEFAULT 'general', alt_text TEXT,
+  deleted_at TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- BANNERS
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS banners (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, subtitle TEXT,
   heading TEXT, subheading TEXT, button_text TEXT, button_url TEXT,
@@ -108,6 +141,9 @@ CREATE TABLE IF NOT EXISTS homepage_sections (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- COUPONS
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS coupons (
   id TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL, description TEXT,
   discount_type TEXT NOT NULL DEFAULT 'percentage', discount_value REAL NOT NULL,
@@ -118,6 +154,9 @@ CREATE TABLE IF NOT EXISTS coupons (
   is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- ORDERS (with soft-delete / trash)
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY, order_number TEXT UNIQUE NOT NULL,
   customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
@@ -131,6 +170,11 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_status TEXT NOT NULL DEFAULT 'pending',
   status TEXT NOT NULL DEFAULT 'pending',
   whatsapp_sent INTEGER DEFAULT 0, invoice_url TEXT, notes TEXT,
+  steadfast_consignment_id TEXT DEFAULT NULL,
+  steadfast_tracking_code TEXT DEFAULT NULL,
+  steadfast_status TEXT DEFAULT NULL,
+  steadfast_booked_at TEXT DEFAULT NULL,
+  deleted_at TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -141,6 +185,9 @@ CREATE TABLE IF NOT EXISTS order_status_history (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- REVIEWS
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS reviews (
   id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
@@ -163,6 +210,9 @@ CREATE TABLE IF NOT EXISTS coupon_usage (
   used_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- BLOG (with soft-delete / trash)
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS blog_categories (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -175,10 +225,25 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   author_id TEXT REFERENCES admin_users(id) ON DELETE SET NULL,
   tags TEXT DEFAULT '[]', is_published INTEGER DEFAULT 0, views INTEGER DEFAULT 0,
   meta_title TEXT, meta_description TEXT, published_at TEXT,
+  deleted_at TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ═══════════════════════════════════════════════════════════
+-- STEADFAST COURIER SETTINGS
+-- ═══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS steadfast_config (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  api_key TEXT,
+  secret_key TEXT,
+  is_active INTEGER DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ═══════════════════════════════════════════════════════════
+-- MENUS / PAGES
+-- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS menus (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, location TEXT UNIQUE NOT NULL,
   items TEXT DEFAULT '[]', updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -197,16 +262,41 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
   is_active INTEGER DEFAULT 1, subscribed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
-CREATE INDEX IF NOT EXISTS idx_products_published ON products(is_published);
-CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_number ON orders(order_number);
-CREATE INDEX IF NOT EXISTS idx_reviews_product ON reviews(product_id);
-CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
-CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
-CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+-- ═══════════════════════════════════════════════════════════
+-- INDEXES
+-- ═══════════════════════════════════════════════════════════
+CREATE INDEX IF NOT EXISTS idx_products_category   ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_slug       ON products(slug);
+CREATE INDEX IF NOT EXISTS idx_products_published  ON products(is_published);
+CREATE INDEX IF NOT EXISTS idx_products_deleted    ON products(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_orders_customer     ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status       ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_number       ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_deleted      ON orders(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_blog_deleted        ON blog_posts(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_reviews_product     ON reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_categories_slug     ON categories(slug);
+CREATE INDEX IF NOT EXISTS idx_customers_email     ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_phone     ON customers(phone);
 `;
 
-module.exports = schema;
+// ─── Migration: add new columns to existing tables if they don't exist ───────
+const migrations = [
+  // admin_users: add permissions + invited_by
+  `ALTER TABLE admin_users ADD COLUMN permissions TEXT DEFAULT '[]'`,
+  `ALTER TABLE admin_users ADD COLUMN invited_by TEXT`,
+  // products: soft delete
+  `ALTER TABLE products ADD COLUMN deleted_at TEXT DEFAULT NULL`,
+  // orders: soft delete + steadfast
+  `ALTER TABLE orders ADD COLUMN deleted_at TEXT DEFAULT NULL`,
+  `ALTER TABLE orders ADD COLUMN steadfast_consignment_id TEXT DEFAULT NULL`,
+  `ALTER TABLE orders ADD COLUMN steadfast_tracking_code TEXT DEFAULT NULL`,
+  `ALTER TABLE orders ADD COLUMN steadfast_status TEXT DEFAULT NULL`,
+  `ALTER TABLE orders ADD COLUMN steadfast_booked_at TEXT DEFAULT NULL`,
+  // blog_posts: soft delete
+  `ALTER TABLE blog_posts ADD COLUMN deleted_at TEXT DEFAULT NULL`,
+  // media: soft delete
+  `ALTER TABLE media ADD COLUMN deleted_at TEXT DEFAULT NULL`,
+];
+
+module.exports = { schema, migrations };

@@ -60,6 +60,7 @@ app.use('/api/coupons', require('./routes/coupons'));
 app.use('/api/blog', require('./routes/blog'));
 app.use('/api/media', require('./routes/media'));
 app.use('/api/attributes', require('./routes/attributes'));
+app.use('/api/admin-users', require('./routes/adminUsers'));
 
 app.get('/api/admin/dashboard', require('./middleware/auth').adminAuth, (req, res) => {
   const db = getDB();

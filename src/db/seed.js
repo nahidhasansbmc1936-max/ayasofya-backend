@@ -12,13 +12,21 @@ async function seed() {
   console.log('🌱 Seeding AYASOFYA database...');
 
   // ─── Admin Users ────────────────────────────────────────────
-  const existingAdmin = db.prepare('SELECT id FROM admin_users WHERE email = ?').get('admin@ayasofya.com');
-  if (!existingAdmin) {
-    const hash = bcrypt.hashSync('admin123', 10);
-    db.prepare(`INSERT INTO admin_users (id, name, email, password, role) VALUES (?,?,?,?,?)`).run(
-      uuidv4(), 'Super Admin', 'admin@ayasofya.com', hash, 'super_admin'
+  // Migrate: if old default admin exists, deactivate it
+  const oldAdmin = db.prepare("SELECT id FROM admin_users WHERE email = 'admin@ayasofya.com'").get();
+  if (oldAdmin) {
+    db.prepare("UPDATE admin_users SET is_active = 0 WHERE email = 'admin@ayasofya.com'").run();
+  }
+
+  // Create owner with ayasofyabrand@gmail.com if not exists
+  const ownerExists = db.prepare("SELECT id FROM admin_users WHERE email = 'ayasofyabrand@gmail.com'").get();
+  if (!ownerExists) {
+    const hash = bcrypt.hashSync('Ayasofya@2024', 10);
+    db.prepare(`INSERT INTO admin_users (id, name, email, password, role, permissions) VALUES (?,?,?,?,?,?)`).run(
+      uuidv4(), 'Owner', 'ayasofyabrand@gmail.com', hash, 'super_admin', JSON.stringify(['*'])
     );
-    console.log('✅ Admin created: admin@ayasofya.com / admin123');
+    console.log('✅ Owner created: ayasofyabrand@gmail.com / Ayasofya@2024');
+    console.log('⚠️  Please change the password immediately from Admin → Account & Security');
   }
 
   // ─── Settings ───────────────────────────────────────────────
