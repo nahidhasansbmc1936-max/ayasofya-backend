@@ -110,11 +110,13 @@ CREATE TABLE IF NOT EXISTS product_variations (
 );
 
 -- ═══════════════════════════════════════════════════════════
--- MEDIA LIBRARY
+-- MEDIA LIBRARY  (data column stores base64 for DB-persisted images)
 -- ═══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS media (
   id TEXT PRIMARY KEY, filename TEXT NOT NULL, original_name TEXT NOT NULL,
-  mimetype TEXT NOT NULL, size INTEGER NOT NULL, url TEXT NOT NULL,
+  mimetype TEXT NOT NULL, size INTEGER NOT NULL,
+  url TEXT NOT NULL,       -- /api/media/img/:id  (always valid, served from DB)
+  data TEXT,               -- base64 image data stored in DB for persistence
   folder TEXT DEFAULT 'general', alt_text TEXT,
   deleted_at TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -295,8 +297,9 @@ const migrations = [
   `ALTER TABLE orders ADD COLUMN steadfast_booked_at TEXT DEFAULT NULL`,
   // blog_posts: soft delete
   `ALTER TABLE blog_posts ADD COLUMN deleted_at TEXT DEFAULT NULL`,
-  // media: soft delete
+  // media: soft delete + data column for DB-persisted base64
   `ALTER TABLE media ADD COLUMN deleted_at TEXT DEFAULT NULL`,
+  `ALTER TABLE media ADD COLUMN data TEXT`,
 ];
 
 module.exports = { schema, migrations };

@@ -30,11 +30,16 @@ router.put('/admin', adminAuth, (req, res) => {
 
 router.post('/admin/upload/:type', adminAuth, generalUpload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File required' });
-  const url = `/uploads/general/${req.file.filename}`;
   const keyMap = { logo: 'logo_url', favicon: 'favicon_url', mobile_logo: 'mobile_logo_url', footer_logo: 'footer_logo_url' };
   const key = keyMap[req.params.type];
   if (!key) return res.status(400).json({ error: 'Invalid type' });
   const db = getDB();
+  const { v4: uuidv4 } = require('uuid');
+  const mid = uuidv4();
+  const url = `/api/media/img/${mid}`;
+  db.prepare(
+    `INSERT INTO media (id,filename,original_name,mimetype,size,url,data,folder) VALUES (?,?,?,?,?,?,?,?)`
+  ).run(mid, req.file.originalname, req.file.originalname, req.file.mimetype, req.file.size, url, req.file.buffer.toString('base64'), 'general');
   db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`).run(key, url);
   res.json({ url, key, message: `${req.params.type} uploaded` });
 });
@@ -53,10 +58,22 @@ router.get('/admin/banners', adminAuth, (req, res) => {
 
 router.post('/admin/banners', adminAuth, bannerUpload.fields([{ name: 'desktop_image', maxCount: 1 }, { name: 'mobile_image', maxCount: 1 }]), (req, res) => {
   const db = getDB();
+  const { v4: uuidv4b } = require('uuid');
   const { title, subtitle, heading, subheading, button_text, button_url, overlay_opacity, text_position, type, slide_duration, animation, sort_order } = req.body;
-  const desktop_image = req.files?.desktop_image ? `/uploads/banners/${req.files.desktop_image[0].filename}` : '';
-  const mobile_image = req.files?.mobile_image ? `/uploads/banners/${req.files.mobile_image[0].filename}` : '';
-  const id = uuidv4();
+
+  // Save banner images to media DB for persistence
+  function saveBannerImg(fileObj) {
+    if (!fileObj) return '';
+    const mid = uuidv4b();
+    const url = `/api/media/img/${mid}`;
+    db.prepare(`INSERT INTO media (id,filename,original_name,mimetype,size,url,data,folder) VALUES (?,?,?,?,?,?,?,?)`)
+      .run(mid, fileObj.originalname, fileObj.originalname, fileObj.mimetype, fileObj.size, url, fileObj.buffer.toString('base64'), 'banners');
+    return url;
+  }
+
+  const desktop_image = saveBannerImg(req.files?.desktop_image?.[0]);
+  const mobile_image  = saveBannerImg(req.files?.mobile_image?.[0]);
+  const id = uuidv4b();
   db.prepare(`INSERT INTO banners (id,title,subtitle,heading,subheading,button_text,button_url,desktop_image,mobile_image,overlay_opacity,text_position,type,sort_order,slide_duration,animation) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, title, subtitle || null, heading || null, subheading || null, button_text || null, button_url || null, desktop_image, mobile_image, parseFloat(overlay_opacity) || 0.3, text_position || 'center', type || 'hero', parseInt(sort_order) || 0, parseInt(slide_duration) || 5000, animation || 'fade');
   res.status(201).json({ message: 'Banner created', id });
 });
@@ -66,8 +83,19 @@ router.put('/admin/banners/:id', adminAuth, bannerUpload.fields([{ name: 'deskto
   const existing = db.prepare('SELECT * FROM banners WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Banner not found' });
   const body = req.body;
-  const desktop_image = req.files?.desktop_image ? `/uploads/banners/${req.files.desktop_image[0].filename}` : existing.desktop_image;
-  const mobile_image = req.files?.mobile_image ? `/uploads/banners/${req.files.mobile_image[0].filename}` : existing.mobile_image;
+  const { v4: uuidv4p } = require('uuid');
+
+  function saveBannerImg(fileObj) {
+    if (!fileObj) return null;
+    const mid = uuidv4p();
+    const url = `/api/media/img/${mid}`;
+    db.prepare(`INSERT INTO media (id,filename,original_name,mimetype,size,url,data,folder) VALUES (?,?,?,?,?,?,?,?)`)
+      .run(mid, fileObj.originalname, fileObj.originalname, fileObj.mimetype, fileObj.size, url, fileObj.buffer.toString('base64'), 'banners');
+    return url;
+  }
+
+  const desktop_image = saveBannerImg(req.files?.desktop_image?.[0]) || existing.desktop_image;
+  const mobile_image  = saveBannerImg(req.files?.mobile_image?.[0])  || existing.mobile_image;
   db.prepare(`UPDATE banners SET title=?,subtitle=?,heading=?,subheading=?,button_text=?,button_url=?,desktop_image=?,mobile_image=?,overlay_opacity=?,text_position=?,sort_order=?,slide_duration=?,animation=?,is_active=?,updated_at=datetime('now') WHERE id=?`).run(body.title || existing.title, body.subtitle || existing.subtitle, body.heading || existing.heading, body.subheading || existing.subheading, body.button_text || existing.button_text, body.button_url || existing.button_url, desktop_image, mobile_image, parseFloat(body.overlay_opacity) || existing.overlay_opacity, body.text_position || existing.text_position, parseInt(body.sort_order) || existing.sort_order, parseInt(body.slide_duration) || existing.slide_duration, body.animation || existing.animation, body.is_active === 'false' ? 0 : 1, req.params.id);
   res.json({ message: 'Banner updated' });
 });

@@ -1,11 +1,12 @@
 const multer = require('multer');
-const path = require('path');
+const path   = require('path');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
+const fs     = require('fs');
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || './uploads';
 
-function createStorage(folder) {
+// ── Disk storage (used locally / when persistent disk is available) ──────────
+function createDiskStorage(folder) {
   return multer.diskStorage({
     destination: (req, file, cb) => {
       const dir = path.join(UPLOADS_DIR, folder);
@@ -19,17 +20,25 @@ function createStorage(folder) {
   });
 }
 
+// ── Memory storage — files stored as Buffer in req.file.buffer ───────────────
+// Used for images that must persist in the database (Render Free has no persistent disk)
+const memoryStorage = multer.memoryStorage();
+
 function fileFilter(req, file, cb) {
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
   if (allowed.includes(file.mimetype)) cb(null, true);
   else cb(new Error('Only image files are allowed'), false);
 }
 
-const productUpload = multer({ storage: createStorage('products'), fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
-const bannerUpload = multer({ storage: createStorage('banners'), fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
-const categoryUpload = multer({ storage: createStorage('categories'), fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
-const blogUpload = multer({ storage: createStorage('blog'), fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
-const mediaUpload = multer({ storage: createStorage('media'), fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
-const generalUpload = multer({ storage: createStorage('general'), fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+// ── Exports ───────────────────────────────────────────────────────────────────
+// productUpload, bannerUpload, generalUpload → memory storage (DB-persisted)
+// Others keep disk storage as before (no change to those flows)
+
+const productUpload  = multer({ storage: memoryStorage,                    fileFilter, limits: { fileSize: 5  * 1024 * 1024 } });
+const bannerUpload   = multer({ storage: memoryStorage,                    fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+const generalUpload  = multer({ storage: memoryStorage,                    fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+const categoryUpload = multer({ storage: createDiskStorage('categories'),  fileFilter, limits: { fileSize: 5  * 1024 * 1024 } });
+const blogUpload     = multer({ storage: memoryStorage,                    fileFilter, limits: { fileSize: 5  * 1024 * 1024 } });
+const mediaUpload    = multer({ storage: memoryStorage,                    fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
 
 module.exports = { productUpload, bannerUpload, categoryUpload, blogUpload, mediaUpload, generalUpload };

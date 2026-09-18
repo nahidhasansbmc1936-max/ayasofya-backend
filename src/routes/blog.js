@@ -46,7 +46,16 @@ router.post('/admin', adminAuth, blogUpload.single('featured_image'), (req, res)
   if (!title) return res.status(400).json({ error: 'Title required' });
   const id = uuidv4();
   const postSlug = slug(title) + '-' + id.substring(0, 6);
-  const featured_image = req.file ? `/uploads/blog/${req.file.filename}` : null;
+
+  // Save blog image to media DB
+  let featured_image = null;
+  if (req.file) {
+    const mid = uuidv4();
+    featured_image = `/api/media/img/${mid}`;
+    db.prepare(`INSERT INTO media (id,filename,original_name,mimetype,size,url,data,folder) VALUES (?,?,?,?,?,?,?,?)`)
+      .run(mid, req.file.originalname, req.file.originalname, req.file.mimetype, req.file.size, featured_image, req.file.buffer.toString('base64'), 'blog');
+  }
+
   const publish = is_published === 'true' || is_published === true;
   db.prepare(`INSERT INTO blog_posts (id,title,slug,excerpt,content,featured_image,category_id,author_id,tags,is_published,meta_title,meta_description,published_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, title, postSlug, excerpt || null, content || null, featured_image, category_id || null, req.admin.id, tags ? (Array.isArray(tags) ? JSON.stringify(tags) : tags) : '[]', publish ? 1 : 0, meta_title || null, meta_description || null, publish ? new Date().toISOString() : null);
   res.status(201).json({ message: 'Post created', id });
@@ -57,7 +66,16 @@ router.put('/admin/:id', adminAuth, blogUpload.single('featured_image'), (req, r
   const existing = db.prepare('SELECT * FROM blog_posts WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Post not found' });
   const body = req.body;
-  const featured_image = req.file ? `/uploads/blog/${req.file.filename}` : existing.featured_image;
+
+  // Save new blog image to media DB if provided
+  let featured_image = existing.featured_image;
+  if (req.file) {
+    const mid = uuidv4();
+    featured_image = `/api/media/img/${mid}`;
+    db.prepare(`INSERT INTO media (id,filename,original_name,mimetype,size,url,data,folder) VALUES (?,?,?,?,?,?,?,?)`)
+      .run(mid, req.file.originalname, req.file.originalname, req.file.mimetype, req.file.size, featured_image, req.file.buffer.toString('base64'), 'blog');
+  }
+
   const publish = body.is_published === 'true' || body.is_published === true;
   db.prepare(`UPDATE blog_posts SET title=?,excerpt=?,content=?,featured_image=?,category_id=?,tags=?,is_published=?,meta_title=?,meta_description=?,published_at=?,updated_at=datetime('now') WHERE id=?`).run(body.title || existing.title, body.excerpt || existing.excerpt, body.content || existing.content, featured_image, body.category_id || existing.category_id, body.tags ? (Array.isArray(body.tags) ? JSON.stringify(body.tags) : body.tags) : existing.tags, publish ? 1 : 0, body.meta_title || existing.meta_title, body.meta_description || existing.meta_description, publish && !existing.published_at ? new Date().toISOString() : existing.published_at, req.params.id);
   res.json({ message: 'Post updated' });
